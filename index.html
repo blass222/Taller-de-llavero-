@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Generador web de llaveros, marcapáginas y toppers 3D (.3mf) a partir de imágenes.">
+<title>Taller de llaveros 3D</title>
+<style>
+:root{--bg:#e9eef2;--panel:#fff;--ink:#17202e;--mute:#5d6b7e;--line:#cfd8e1;--accent:#e0366f;--mat:#2f7d6b;--matline:#4a9a86;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10161f;--panel:#19212d;--ink:#e8edf3;--mute:#93a1b4;--line:#2b3646;--accent:#ff5c93;--mat:#1f5a4d;--matline:#2f7565}}
+:root[data-theme="dark"]{--bg:#10161f;--panel:#19212d;--ink:#e8edf3;--mute:#93a1b4;--line:#2b3646;--accent:#ff5c93;--mat:#1f5a4d;--matline:#2f7565}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 "Bricolage Grotesque","Trebuchet MS",system-ui,sans-serif}
+header{padding:20px 20px 4px;max-width:1000px;margin:auto}
+h1{font-size:clamp(26px,5vw,38px);margin:0;letter-spacing:-.02em}
+header p{margin:4px 0 0;color:var(--mute)}
+main{max-width:1000px;margin:auto;padding:16px 20px 32px;display:grid;gap:16px;grid-template-columns:320px 1fr}
+@media(max-width:760px){main{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:14px}
+label{font-size:14px;color:var(--mute);display:flex;justify-content:space-between;gap:8px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:18px;text-align:center;cursor:pointer;color:var(--mute);transition:border-color .2s,color .2s,background-color .2s}
+.drop:hover,.drop:focus-visible,.drop.drag{border-color:var(--accent);color:var(--ink);outline:none;background:rgba(224,54,111,.05)}
+.sw{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px}
+.sw div{display:flex;flex-direction:column;gap:4px;align-items:center;font-size:12px;color:var(--mute)}
+.sw input[type=color]{width:100%;height:44px;border:1px solid var(--line);border-radius:10px;padding:0;background:none;cursor:pointer}
+.sw button{font:inherit;font-size:12px;border:1px solid var(--line);background:none;color:var(--mute);border-radius:8px;padding:2px 6px;cursor:pointer}
+.sw button[aria-pressed=true]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.stage{background:var(--mat);background-image:linear-gradient(var(--matline) 1px,transparent 1px),linear-gradient(90deg,var(--matline) 1px,transparent 1px);background-size:24px 24px;border-radius:14px;display:flex;align-items:center;justify-content:center;min-height:380px;padding:20px;position:relative;overflow:hidden}
+canvas{max-width:100%;max-height:70vh;image-rendering:pixelated;filter:drop-shadow(0 6px 8px rgba(0,0,0,.35))}
+.empty{color:#fff;text-align:center;max-width:260px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+button.main{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:12px 16px;font:inherit;font-weight:600;cursor:pointer;transition:opacity .2s}
+button.main:disabled{opacity:.4;cursor:not-allowed}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.mb{border:0;border-radius:8px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer;background:rgba(255,255,255,.25);color:#fff}.mb[aria-pressed=true]{background:#fff;color:#17202e}
+.size{color:#fff;font-size:13px;position:absolute;bottom:8px;right:12px;opacity:.85}
+select{width:100%;font:inherit;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+</style>
+</head>
+<body>
+<header>
+<h1>Taller de llaveros</h1>
+<p>Sube una imagen, cambia sus colores y descarga tu llavero listo para imprimir en 3D.</p>
+</header>
+<main>
+<section class="panel" aria-label="Controles">
+<div class="drop" id="drop" tabindex="0" role="button">Toca o arrastra una imagen<br><small>PNG, JPG o WebP</small></div>
+<input type="file" id="file" accept="image/*" hidden>
+<div><label>Cantidad de colores <b id="kv">4</b></label><input type="range" id="k" min="2" max="8" value="4"></div>
+<div><label>Colores (toca para cambiar)</label><div class="sw" id="sw"></div></div>
+<label style="align-items:center"><span>Quitar fondo</span><input type="checkbox" id="rmbg" checked></label>
+<div><label>Borde <b id="ov">6</b></label><input type="range" id="o" min="0" max="16" value="6"></div>
+<div class="row"><label style="flex:1">Color del borde</label><input type="color" id="oc" value="#1a1a1a" style="width:56px;height:36px"></div>
+<div><label>Grosor del borde <b id="stv">1.2</b> mm</label><input type="range" id="st" min="0.4" max="4" step="0.2" value="1.2"></div>
+<label style="align-items:center"><span>Colgador / Accesorio</span><input type="checkbox" id="ring" checked></label>
+<select id="atype" aria-label="Tipo de colgador">
+  <option value="hook">Hook (pestaña con agujero)</option>
+  <option value="hole">Hole (agujero en la placa)</option>
+  <option value="bookmark">Bookmark (marcapáginas)</option>
+  <option value="pick1">Palito para torta (1)</option>
+  <option value="pick2">Palitos para torta (2)</option>
+</select>
+<div id="plwrap" style="display:none"><label>Largo del palito <b id="plv">70</b> mm</label><input type="range" id="pl" min="30" max="120" step="5" value="70"></div>
+<div><label>Forma de la base</label>
+<select id="shape">
+  <option value="contour">Seguir el contorno</option>
+  <option value="circle">Círculo</option>
+  <option value="round">Cuadrado redondeado</option>
+  <option value="heart">Corazón</option>
+</select></div>
+<div class="row"><label style="flex:1">Color de la placa</label><input type="color" id="pc" value="#ffffff" style="width:56px;height:36px"></div>
+<div><label>Grosor de la placa <b id="btv">1.2</b> mm</label><input type="range" id="bt" min="1" max="4" step="0.2" value="1.2"></div>
+<div><label>Grosor de la imagen <b id="itv">0.8</b> mm</label><input type="range" id="it" min="0.4" max="2" step="0.2" value="0.8"></div>
+<div><label>Ancho del llavero <b id="wv">50</b> mm</label><input type="range" id="w" min="30" max="80" value="50"></div>
+<button class="main" id="d3" disabled>Descargar 3D (.3mf)</button>
+<button class="main" id="dl" disabled style="background:var(--ink);color:var(--panel)">Descargar PNG</button>
+</section>
+<section class="stage" id="stage">
+<div class="empty" id="empty">Aquí verás tu llavero. Empieza subiendo una imagen.</div>
+<canvas id="cv" hidden></canvas>
+<div id="sel" style="display:none;position:absolute;top:8px;left:8px;right:8px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;gap:12px;align-items:center;flex-wrap:wrap;z-index:2">
+  <input type="color" id="selc" aria-label="Color seleccionado" style="width:48px;height:36px;border:0;padding:0;background:none">
+  <div style="flex:1;min-width:150px"><label>Altura de este color <b id="relv"></b> mm</label><input type="range" id="relh" min="0.2" max="3" step="0.2"></div>
+  <button id="selx" aria-label="Cerrar" style="border:0;background:none;color:var(--mute);font-size:22px;cursor:pointer">×</button>
+</div>
+<canvas id="cv3" style="display:none;position:absolute;inset:0;width:100%;height:100%;max-width:none;max-height:none;touch-action:none;image-rendering:auto;filter:none;cursor:grab"></canvas>
+<div style="position:absolute;left:10px;bottom:8px;z-index:3;display:flex;gap:6px">
+  <button class="mb" id="b2" aria-pressed="true">2D</button>
+  <button class="mb" id="b3" aria-pressed="false">3D</button>
+  <button class="mb" id="rst" style="display:none">Restablecer</button>
+</div>
+<span class="size" id="size"></span>
+</section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const N=160,PAD=20;
+let labels=null,palette=[],hidden=[],W=0,H=0,px=null;
+let L=null,B=null,S=1,hts=[],selj=-1;
+const cv=$('cv'),ctx=cv.getContext('2d');
+
+function handleFile(f){
+  if(!f||!f.type.startsWith('image/'))return;
+  const img=new Image();
+  img.onload=()=>{load(img);URL.revokeObjectURL(img.src)};
+  img.src=URL.createObjectURL(f);
+}
+
+$('drop').onclick=()=>$('file').click();
+$('drop').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('file').click()}};
+$('file').onchange=e=>handleFile(e.target.files[0]);
+$('drop').ondragover=e=>{e.preventDefault();$('drop').classList.add('drag')};
+$('drop').ondragleave=()=>$('drop').classList.remove('drag');
+$('drop').ondrop=e=>{e.preventDefault();$('drop').classList.remove('drag');handleFile(e.dataTransfer.files[0])};
+
+function load(img){
+  const c=document.createElement('canvas');c.width=c.height=N;
+  const x=c.getContext('2d',{willReadFrequently:true});
+  const s=Math.min(N/img.width,N/img.height),w=img.width*s,h=img.height*s;
+  x.drawImage(img,(N-w)/2,(N-h)/2,w,h);
+  px=x.getImageData(0,0,N,N).data;
+  quantize();
+}
+
+function quantize(){
+  if(!px)return;
+  const k=+$('k').value,rm=$('rmbg').checked;
+  const cr=[0,(N-1)*4,(N-1)*N*4,((N-1)*N+N-1)*4].map(i=>[px[i],px[i+1],px[i+2],px[i+3]]);
+  const bg=cr.find(c=>c[3]>128)||[255,255,255,255];
+  const bgOpaque=cr.every(c=>c[3]>128);
+  const pts=[],idx=[];
+  const lab=new Int8Array(N*N).fill(-1);
+  for(let i=0;i<N*N;i++){
+    const r=px[i*4],g=px[i*4+1],b=px[i*4+2],a=px[i*4+3];
+    if(a<128)continue;
+    if(rm&&bgOpaque&&Math.hypot(r-bg[0],g-bg[1],b-bg[2])<45)continue;
+    pts.push([r,g,b]);idx.push(i);
+  }
+  if(!pts.length){alert('No quedó nada de imagen. Prueba desactivar “Quitar fondo”.');return}
+  let cen=[];for(let j=0;j<k;j++)cen.push(pts[Math.floor(j*pts.length/k+pts.length/(2*k))].slice());
+  const as=new Int8Array(pts.length);
+  for(let it=0;it<10;it++){
+    const sum=cen.map(()=>[0,0,0,0]);
+    pts.forEach((p,i)=>{let bi=0,bd=1e9;cen.forEach((c,j)=>{const d=(p[0]-c[0])**2+(p[1]-c[1])**2+(p[2]-c[2])**2;if(d<bd){bd=d;bi=j}});as[i]=bi;const s=sum[bi];s[0]+=p[0];s[1]+=p[1];s[2]+=p[2];s[3]++});
+    cen=cen.map((c,j)=>sum[j][3]?[sum[j][0]/sum[j][3],sum[j][1]/sum[j][3],sum[j][2]/sum[j][3]]:c);
+  }
+  const order=cen.map((c,j)=>[c[0]*.3+c[1]*.59+c[2]*.11,j]).sort((a,b)=>a[0]-b[0]).map(o=>o[1]);
+  const remap=[];order.forEach((j,n)=>remap[j]=n);
+  idx.forEach((p,i)=>lab[p]=remap[as[i]]);
+  palette=order.map(j=>'#'+cen[j].map(v=>Math.round(v).toString(16).padStart(2,'0')).join(''));
+  hidden=palette.map(()=>false);labels=lab;hts=[];$('sel').style.display='none';$('stage').style.paddingTop='';
+  swatches();render();
+}
+
+function swatches(){
+  const sw=$('sw');sw.innerHTML='';
+  palette.forEach((c,i)=>{
+    const d=document.createElement('div');
+    const inp=document.createElement('input');inp.type='color';inp.value=c;inp.setAttribute('aria-label','Color '+(i+1));
+    inp.oninput=()=>{palette[i]=inp.value;if(selj===i)$('selc').value=inp.value;render()};
+    const b=document.createElement('button');b.textContent='Quitar';b.setAttribute('aria-pressed',hidden[i]);
+    b.onclick=()=>{hidden[i]=!hidden[i];b.setAttribute('aria-pressed',hidden[i]);b.textContent=hidden[i]?'Quitado':'Quitar';render()};
+    d.append(inp,b);sw.append(d);
+  });
+}
+
+function inShape(x,y){
+  const u=(x+.5)/N*2-1,v=(y+.5)/N*2-1,s=$('shape').value;
+  if(s==='circle')return u*u+v*v<=1;
+  if(s==='round')return u**4+v**4<=1;
+  if(s==='heart'){const a=u*1.2,b=-v*1.15+.15;return (a*a+b*b-1)**3-a*a*b**3<=0}
+  return true;
+}
+
+function render(){
+  const ring=$('ring').checked,at=ring?$('atype').value:'none';
+  $('atype').style.display=ring?'':'none';
+  $('plwrap').style.display=(ring&&at.startsWith('pick'))?'':'none';
+  if(!labels)return;
+  const ol=+$('o').value,oc=$('oc').value,sh=$('shape').value;
+  let hx=-99,hy=-99;const HR=6,inH=i=>((i%N)+.5-hx)**2+((i/N|0)+.5-hy)**2<HR*HR;
+  const vis=i=>labels[i]>=0&&!hidden[labels[i]]&&inShape(i%N,(i/N)|0)&&!inH(i);
+  const sol=i=>sh==='contour'?vis(i):inShape(i%N,(i/N)|0)&&!inH(i);
+  let top=N,bot=-1,sx=0,sn=0;
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(sol(y*N+x)){if(y<top){top=y;sx=0;sn=0}if(y===top){sx+=x;sn++}bot=y}
+  if(bot<0){cv.hidden=true;return}
+  const tx=sx/sn+.5,T=at==='hook'?46:PAD,ox=PAD,oy=T-top;
+  let bxs=0,bn=0;for(let x=0;x<N;x++)if(sol(bot*N+x)){bxs+=x;bn++}const bxm=bxs/bn+.5;
+  const pxm=(N+2*PAD)/+$('w').value,PL=Math.round(+$('pl').value*pxm);
+  if(at==='hole'){hx=tx;hy=top+11}
+  W=N+2*PAD;H=T+(bot-top+1)+(at==='bookmark'?130+PAD:at.startsWith('pick')?PL+PAD:PAD);cv.width=W;cv.height=H;
+  const mk=(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c};
+  const sil=mk(N,N),sc=sil.getContext('2d'),sd=sc.createImageData(N,N);
+  const oR=parseInt(oc.substr(1,2),16),oG=parseInt(oc.substr(3,2),16),oB=parseInt(oc.substr(5,2),16);
+  for(let i=0;i<N*N;i++)if(sol(i))sd.data.set([oR,oG,oB,255],i*4);
+  sc.putImageData(sd,0,0);
+  const bc=mk(W,H),bx=bc.getContext('2d',{willReadFrequently:true});bx.imageSmoothingEnabled=false;
+  if(ol>0)for(let a=0;a<32;a++){const t=a/32*Math.PI*2;for(const m of [ol,ol*.5])bx.drawImage(sil,ox+Math.round(Math.cos(t)*m),oy+Math.round(Math.sin(t)*m))}
+  bx.drawImage(sil,ox,oy);
+  const ex=mk(W,H),ex2=ex.getContext('2d',{willReadFrequently:true}),rx=ox+tx,cut=(c,f)=>{c.globalCompositeOperation='destination-out';c.beginPath();f(c);c.fill('evenodd');c.globalCompositeOperation='source-over'};
+  ex2.fillStyle=$('pc').value;
+  if(at==='hook'){
+    ex2.fillRect(rx-7,17,14,T-13);ex2.beginPath();ex2.arc(rx,17,14,0,7);ex2.fill();
+    for(const c of [bx,ex2])cut(c,k=>k.arc(rx,17,6,0,7));
+  }
+  if(at==='hole')cut(bx,k=>k.arc(rx,oy+hy,HR,0,7));
+  if(at==='pick1'||at==='pick2'){
+    let mn=N,mx=0;for(let i=0;i<N*N;i++)if(sol(i)){const x=i%N;if(x<mn)mn=x;if(x>mx)mx=x}
+    const pw=Math.max(8,Math.round(4*pxm)),xs=at==='pick1'?[(mn+mx+1)/2]:[mn+(mx-mn)*.27+.5,mn+(mx-mn)*.73+.5];
+    ex2.beginPath();
+    for(const xc of xs){
+      let ym=bot;for(let y=bot;y>=top;y--)if(sol(y*N+Math.floor(xc))){ym=y;break}
+      const cx=ox+xc,ys=oy+ym+1-6,ye=oy+ym+1+PL,tp=pw*1.5;
+      ex2.moveTo(cx-pw/2,ys);ex2.lineTo(cx-pw/2,ye-tp);ex2.lineTo(cx,ye);ex2.lineTo(cx+pw/2,ye-tp);ex2.lineTo(cx+pw/2,ys);ex2.closePath();
+    }
+    ex2.fill();
+  }
+  if(at==='bookmark'){
+    const cx=ox+bxm,yb=oy+bot+1,y0=yb-2,y1=yb+130,U=(k,a,b,ys,ye)=>{const r=(b-a)/2;k.moveTo(a,ys);k.lineTo(a,ye-r);k.arc(a+r,ye-r,r,Math.PI,0,true);k.lineTo(b,ys);k.closePath()};
+    ex2.beginPath();U(ex2,cx-22,cx+22,y0,y1);ex2.fill();
+    const ys=yb+ol+2;cut(ex2,k=>{U(k,cx-16,cx+16,ys,y1-6);U(k,cx-9,cx+9,ys,y1-13)});
+  }
+  const ac=mk(N,N),ax=ac.getContext('2d'),ad=ax.createImageData(N,N);
+  const rgb=palette.map(c=>[1,3,5].map(o=>parseInt(c.substr(o,2),16)));
+  L=new Int8Array(W*H).fill(-2);
+  const bd=bx.getImageData(0,0,W,H).data;
+  for(let i=0;i<W*H;i++)if(bd[i*4+3]>128)L[i]=-1;
+  for(let i=0;i<N*N;i++)if(sol(i))L[((i/N|0)+oy)*W+(i%N)+ox]=-3;
+  const ed=ex2.getImageData(0,0,W,H).data;for(let i=0;i<W*H;i++)if(ed[i*4+3]>128)L[i]=-3;
+  B=L.slice();
+  const pcv=mk(N,N),pcx=pcv.getContext('2d'),pdd=pcx.createImageData(N,N),plc=[1,3,5].map(o=>parseInt($('pc').value.substr(o,2),16));
+  for(let i=0;i<N*N;i++)if(sol(i))pdd.data.set([plc[0],plc[1],plc[2],255],i*4);
+  pcx.putImageData(pdd,0,0);
+  for(let i=0;i<N*N;i++)if(vis(i)){const c=rgb[labels[i]];ad.data.set([c[0],c[1],c[2],255],i*4);L[((i/N|0)+oy)*W+(i%N)+ox]=labels[i]}
+  ax.putImageData(ad,0,0);
+  ctx.clearRect(0,0,W,H);ctx.drawImage(bc,0,0);ctx.drawImage(pcv,ox,oy);ctx.drawImage(ex,0,0);
+  const gi=+$('it').value,ord=palette.map((_,j)=>j).filter(j=>!hidden[j]).sort((a,b)=>(hts[a]??gi)-(hts[b]??gi));
+  for(const j of ord){
+    const pc=mk(N,N),pd=pc.getContext('2d'),d2=pd.createImageData(N,N),c=rgb[j],h=hts[j]??gi;
+    for(let i=0;i<N*N;i++)if(vis(i)&&labels[i]===j)d2.data.set([c[0],c[1],c[2],255],i*4);
+    pd.putImageData(d2,0,0);
+    ctx.shadowColor='rgba(0,0,0,.5)';ctx.shadowBlur=h*1.5;ctx.shadowOffsetX=h*.8;ctx.shadowOffsetY=h*1.2;
+    ctx.drawImage(pc,ox,oy);
+  }
+  ctx.shadowColor='transparent';ctx.shadowBlur=ctx.shadowOffsetX=ctx.shadowOffsetY=0;
+  cv.hidden=false;$('empty').hidden=true;$('dl').disabled=$('d3').disabled=false;
+  const mm=+$('w').value;S=mm/W;if(mode3)upd3();
+  $('size').textContent=mm+' × '+Math.round(mm*H/W)+' × '+(+$('bt').value+Math.max(+$('it').value,...hts.filter(Boolean))).toFixed(1)+' mm';
+}
+
+['k','rmbg'].forEach(i=>$(i).oninput=()=>{$('kv').textContent=$('k').value;quantize()});
+['o','oc','ring'].forEach(i=>$(i).oninput=()=>{$('ov').textContent=$('o').value;render()});
+$('w').oninput=()=>{$('wv').textContent=$('w').value;render()};
+['shape','bt','it'].forEach(i=>$(i).oninput=()=>{$('btv').textContent=$('bt').value;$('itv').textContent=$('it').value;render()});
+['pc','st'].forEach(i=>$(i).oninput=()=>{$('stv').textContent=$('st').value;render()});
+$('atype').oninput=render;
+$('pl').oninput=()=>{$('plv').textContent=$('pl').value;render()};
+
+$('dl').onclick=()=>{
+  const c=document.createElement('canvas');c.width=W*4;c.height=H*4;
+  const x=c.getContext('2d');x.imageSmoothingEnabled=false;x.drawImage(cv,0,0,c.width,c.height);
+  const a=document.createElement('a');a.download='llavero.png';a.href=c.toDataURL('image/png');a.click();
+};
+
+const T12=[[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[2,3,7],[2,7,6],[3,0,4],[3,4,7],[1,2,6],[1,6,5]];
+function rects(mask){
+  const used=new Uint8Array(W*H),R=[];
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    if(!mask[y*W+x]||used[y*W+x])continue;
+    let x2=x;while(x2+1<W&&mask[y*W+x2+1]&&!used[y*W+x2+1])x2++;
+    let y2=y;
+    ext:while(y2+1<H){for(let k=x;k<=x2;k++)if(!mask[(y2+1)*W+k]||used[(y2+1)*W+k])break ext;y2++}
+    for(let j=y;j<=y2;j++)for(let k=x;k<=x2;k++)used[j*W+k]=1;
+    R.push([x,y,x2+1,y2+1]);
+  }
+  return R;
+}
+
+function mesh(R,z0,z1){
+  const v=[],t=[];let n=0;
+  for(const[a,b,c,d]of R){
+    const x0=a*S,x1=c*S,y0=(H-d)*S,y1=(H-b)*S;
+    [[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]].forEach(p=>v.push('<vertex x="'+p[0].toFixed(3)+'" y="'+p[1].toFixed(3)+'" z="'+p[2].toFixed(3)+'"/>'));
+    for(const q of T12)t.push('<triangle v1="'+(n+q[0])+'" v2="'+(n+q[1])+'" v3="'+(n+q[2])+'"/>');n+=8;
+  }
+  return '<mesh><vertices>'+v.join('')+'</vertices><triangles>'+t.join('')+'</triangles></mesh>';
+}
+
+const crcT=(()=>{const t=[];for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+function crc(b){let c=-1;for(const x of b)c=crcT[(c^x)&255]^(c>>>8);return (~c)>>>0}
+function zip(files){
+  const e=new TextEncoder(),parts=[],cd=[];let off=0;
+  for(const[name,data]of files){
+    const nb=e.encode(name),db=e.encode(data),c=crc(db);
+    const h=new DataView(new ArrayBuffer(30));h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint32(14,c,true);h.setUint32(18,db.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);
+    parts.push(h.buffer,nb,db);
+    const d=new DataView(new ArrayBuffer(46));d.setUint32(0,0x02014b50,true);d.setUint16(4,20,true);d.setUint16(6,20,true);d.setUint32(16,c,true);d.setUint32(20,db.length,true);d.setUint32(24,db.length,true);d.setUint16(28,nb.length,true);d.setUint32(42,off,true);
+    cd.push(d.buffer,nb);off+=30+nb.length+db.length;
+  }
+  let cs=0;cd.forEach(x=>cs+=x.byteLength);
+  const E=new DataView(new ArrayBuffer(22));E.setUint32(0,0x06054b50,true);E.setUint16(8,files.length,true);E.setUint16(10,files.length,true);E.setUint32(12,cs,true);E.setUint32(16,off,true);
+  return new Blob([...parts,...cd,E.buffer],{type:'model/3mf'});
+}
+
+cv.style.cursor='pointer';
+cv.onclick=e=>{
+  if(!L)return;
+  const r=cv.getBoundingClientRect(),x=Math.floor((e.clientX-r.left)/r.width*W),y=Math.floor((e.clientY-r.top)/r.height*H);
+  const j=L[y*W+x];
+  if(j===-1){$('oc').click();return}
+  if(j===-3){$('pc').click();return}
+  if(j<0)return;
+  const
