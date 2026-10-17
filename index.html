@@ -47,10 +47,10 @@ select{width:100%;font:inherit;padding:8px;border-radius:8px;border:1px solid va
 </header>
 <main>
 <section class="panel" aria-label="Controles">
-<label class="drop" id="drop" tabindex="0" role="button">
+<div class="drop" id="drop" tabindex="0" role="button">
   Toca o arrastra una imagen<br><small>PNG, JPG o WebP</small>
-  <input type="file" id="file" accept="image/*" hidden>
-</label>
+  <input type="file" id="file" accept="image/*" style="display:none">
+</div>
 <div><label>Cantidad de colores <b id="kv">4</b></label><input type="range" id="k" min="2" max="8" value="4"></div>
 <div><label>Colores (toca para cambiar)</label><div class="sw" id="sw"></div></div>
 <label style="align-items:center"><span>Quitar fondo</span><input type="checkbox" id="rmbg" checked></label>
@@ -112,8 +112,12 @@ function handleFile(f){
   img.src=URL.createObjectURL(f);
 }
 
-$('file').onchange=e=>handleFile(e.target.files[0]);
-const dropZone=$('drop');
+const dropZone=$('drop'), fileInput=$('file');
+
+dropZone.onclick=()=>fileInput.click();
+dropZone.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fileInput.click()}};
+fileInput.onchange=e=>{if(e.target.files[0])handleFile(e.target.files[0])};
+
 dropZone.ondragover=e=>{e.preventDefault();dropZone.classList.add('drag')};
 dropZone.ondragleave=()=>dropZone.classList.remove('drag');
 dropZone.ondrop=e=>{
@@ -316,10 +320,4 @@ function zip(files){
 cv.style.cursor='pointer';
 cv.onclick=e=>{
   if(!L)return;
-  const r=cv.getBoundingClientRect(),x=Math.floor((e.clientX-r.left)/r.width*W),y=Math.floor((e.clientY-r.top)/r.height*H);
-  const j=L[y*W+x];
-  if(j===-1){$('oc').click();return}
-  if(j===-3){$('pc').click();return}
-  if(j<0)return;
-  const box=$('sw').children[j];if(!box)return;
-  [..
+  const r=cv.getBoundingClientRect(),x=Math.floor((e.clientX-r.left)/r.width*W),y=Math.floor((e.
