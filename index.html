@@ -21,7 +21,7 @@ main{max-width:1000px;margin:auto;padding:16px 20px 32px;display:grid;gap:16px;g
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:14px}
 label{font-size:14px;color:var(--mute);display:flex;justify-content:space-between;gap:8px}
 input[type=range]{width:100%;accent-color:var(--accent)}
-.drop{border:2px dashed var(--line);border-radius:12px;padding:18px;text-align:center;cursor:pointer;color:var(--mute);transition:border-color .2s,color .2s,background-color .2s}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:18px;text-align:center;cursor:pointer;color:var(--mute);display:block;transition:border-color .2s,color .2s,background-color .2s}
 .drop:hover,.drop:focus-visible,.drop.drag{border-color:var(--accent);color:var(--ink);outline:none;background:rgba(224,54,111,.05)}
 .sw{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px}
 .sw div{display:flex;flex-direction:column;gap:4px;align-items:center;font-size:12px;color:var(--mute)}
@@ -47,8 +47,10 @@ select{width:100%;font:inherit;padding:8px;border-radius:8px;border:1px solid va
 </header>
 <main>
 <section class="panel" aria-label="Controles">
-<div class="drop" id="drop" tabindex="0" role="button">Toca o arrastra una imagen<br><small>PNG, JPG o WebP</small></div>
-<input type="file" id="file" accept="image/*" hidden>
+<label class="drop" id="drop" tabindex="0" role="button">
+  Toca o arrastra una imagen<br><small>PNG, JPG o WebP</small>
+  <input type="file" id="file" accept="image/*" hidden>
+</label>
 <div><label>Cantidad de colores <b id="kv">4</b></label><input type="range" id="k" min="2" max="8" value="4"></div>
 <div><label>Colores (toca para cambiar)</label><div class="sw" id="sw"></div></div>
 <label style="align-items:center"><span>Quitar fondo</span><input type="checkbox" id="rmbg" checked></label>
@@ -110,12 +112,17 @@ function handleFile(f){
   img.src=URL.createObjectURL(f);
 }
 
-$('drop').onclick=()=>$('file').click();
-$('drop').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('file').click()}};
 $('file').onchange=e=>handleFile(e.target.files[0]);
-$('drop').ondragover=e=>{e.preventDefault();$('drop').classList.add('drag')};
-$('drop').ondragleave=()=>$('drop').classList.remove('drag');
-$('drop').ondrop=e=>{e.preventDefault();$('drop').classList.remove('drag');handleFile(e.dataTransfer.files[0])};
+const dropZone=$('drop');
+dropZone.ondragover=e=>{e.preventDefault();dropZone.classList.add('drag')};
+dropZone.ondragleave=()=>dropZone.classList.remove('drag');
+dropZone.ondrop=e=>{
+  e.preventDefault();
+  dropZone.classList.remove('drag');
+  if(e.dataTransfer.files[0]){
+    handleFile(e.dataTransfer.files[0]);
+  }
+};
 
 function load(img){
   const c=document.createElement('canvas');c.width=c.height=N;
@@ -314,4 +321,5 @@ cv.onclick=e=>{
   if(j===-1){$('oc').click();return}
   if(j===-3){$('pc').click();return}
   if(j<0)return;
-  const
+  const box=$('sw').children[j];if(!box)return;
+  [..
